@@ -1,0 +1,22 @@
+name: Deploy to AWS EC2                    # name shown in GitHub Actions tab
+
+on:
+  push:
+    branches:
+      - main                               # runs every time you push to main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest                 # GitHub spins up a free Ubuntu machine
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3   # pre-built action that SSHes into a server
+        with:
+          host: ${{ secrets.EC2_HOST }}    # 18.175.211.123 — from GitHub Secrets
+          username: ${{ secrets.EC2_USER }} # ec2-user — from GitHub Secrets
+          key: ${{ secrets.EC2_KEY }}      # rivalyze-key.pem contents — from GitHub Secrets
+          script: |
+            cd rivalyze                    # go into the repo folder on the server
+            git pull origin main           # pull latest code from GitHub
+            sudo docker-compose up --build -d  # rebuild and restart containers
