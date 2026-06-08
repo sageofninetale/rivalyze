@@ -1,0 +1,27 @@
+# docker-compose.yml lets you describe and run one or more containers
+# with a single command: "docker compose up".
+# It is a YAML file — indentation matters (use spaces, not tabs).
+
+# "services" is the top-level key that lists every container you want to run.
+# Each entry under services becomes one running container.
+services:
+
+  # "rivalyze-hello" is the name you give this service.
+  # You can have many services here later (e.g. api, database, redis).
+  rivalyze-hello:
+
+    # build: tells Compose to build the image from a Dockerfile
+    # rather than pulling a pre-built one from Docker Hub.
+    # "." means "look for the Dockerfile in the current directory."
+    build: .
+
+    # image: names the image that gets built.
+    # Without this, Compose generates a name automatically.
+    # Naming it explicitly makes "docker images" easier to read.
+    image: rivalyze-hello
+
+    # restart: "no" means Docker will NOT restart the container
+    # automatically if it exits. For a script that runs once and
+    # finishes, this is correct. Later, for a web server, you'd
+    # use "unless-stopped" instead.
+    restart: "no"

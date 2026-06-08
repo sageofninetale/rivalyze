@@ -1,0 +1,9 @@
+# Add one package per line. Pin versions with == to prevent surprise breakage.
+# Install everything in one shot: pip install -r requirements.txt
+
+python-dotenv       # loads .env files into os.environ (used in agent.py: load_dotenv)
+langchain-core      # base types and interfaces shared across all LangChain packages
+langchain-groq      # LangChain wrapper for the Groq API (ChatGroq class)
+langgraph           # graph-based agent framework built on top of LangChain
+tavily-python       # official Tavily client for real-time web search (TavilyClient)
+rich                # terminal rendering library — renders markdown, tables, and styled text
