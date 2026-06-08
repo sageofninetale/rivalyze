@@ -117,6 +117,9 @@ class RivalyzeState(TypedDict):
     days_back:  int  # number of days to look back for news queries (30, 60, or 90);
                      # set by the user at startup and read by both search nodes for query 1 only
 
+    industry:   str  # optional context string e.g. "UK care home software" or "fintech payments";
+                     # appended to every Tavily query so results are scoped to the right market
+
 # ─────────────────────────────────────────────────────────────
 # BLOCK 3 — SEARCH NODES
 # ─────────────────────────────────────────────────────────────
@@ -131,15 +134,17 @@ def search_company_a(state: RivalyzeState) -> dict:
     # -> dict              — we return only the key(s) we changed, not the whole state
 
     company = state["company_a"]         # read the company name that was set at graph invocation
+    industry = state["industry"]         # optional market context e.g. "UK care home software"
+    context = f" {industry}" if industry else ""  # builds " UK care home software" or "" — only adds context when the user provided one
 
     # ── Query 1: recent news and product launches ──────────────
-    q1 = f"{company} latest news product launches 2025"
-                                         # f-string builds the search query dynamically;
-                                         # "2025" anchors Tavily to recent results
+    q1 = f"{company}{context} latest news product launches 2025"
+                                         # context narrows the query e.g. "Birdie UK care home software latest news 2025"
+                                         # so Tavily returns results in the right market, not a different company with the same name
 
     results_1 = tavily.search(           # call the Tavily API synchronously
         query=q1,                        # the search string built above
-        max_results=5,                   # increased from 3 → 5 for broader research coverage per query                   # fetch 3 results — enough signal without token bloat
+        max_results=7,                   # increased from 5 → 7 for even broader news coverage
         days=state["days_back"],         # use the window the user chose at startup (30, 60, or 90 days)
     )
 
@@ -154,13 +159,13 @@ def search_company_a(state: RivalyzeState) -> dict:
     ]
 
     # ── Query 2: business overview and growth strategy ─────────
-    q2 = f"{company} business overview growth strategy"
-                                         # second angle — longer-horizon strategic context
-                                         # rather than just latest news
+    q2 = f"{company}{context} business overview growth strategy"
+                                         # context appended here too — keeps both queries scoped
+                                         # to the same market segment as query 1
 
     results_2 = tavily.search(           # second API call for the same company
         query=q2,
-        max_results=5,                   # increased from 3 → 5 for broader research coverage per query
+        max_results=7,                   # increased from 5 → 7 to match query 1
                                          # no days= filter here — strategy/overview queries benefit
                                          # from older evergreen content, not just recent news
     )
@@ -175,11 +180,32 @@ def search_company_a(state: RivalyzeState) -> dict:
         for r in results_2["results"]
     ]
 
+    # ── Query 3: funding, investors, and valuation ─────────────
+    q3 = f"{company}{context} funding investors valuation strategy"
+                                         # third angle — surfaces fundraising rounds, investor names,
+                                         # reported valuations, and M&A signals not in the news/strategy queries
+
+    results_3 = tavily.search(           # third API call for the same company
+        query=q3,
+        max_results=7,                   # same depth as the other two queries
+                                         # no days= filter — funding history is evergreen and rounds
+                                         # may have been announced months ago
+    )
+
+    snippets_3 = [                       # same extraction pattern as snippets_1 and snippets_2
+        r["content"]
+        for r in results_3["results"]
+    ]
+
+    sources += [                         # append query-3 sources to the running list
+        {"title": r["title"], "url": r["url"]}
+        for r in results_3["results"]
+    ]
+
     # ── Combine everything into one string ─────────────────────
-    combined = "\n\n".join(snippets_1 + snippets_2)
-                                         # concatenate all 6 snippets (up to) into one block of
-                                         # text separated by blank lines; the LLM node in Block 4
-                                         # will read this as raw research material
+    combined = "\n\n".join(snippets_1 + snippets_2 + snippets_3)
+                                         # all three angles merged into one block of text;
+                                         # the LLM in Block 4 reads this as raw research material
 
     return {                             # return both updated keys together in one dict
         "data_a":  combined,             # research text for the LLM to read
@@ -190,14 +216,16 @@ def search_company_a(state: RivalyzeState) -> dict:
 def search_company_b(state: RivalyzeState) -> dict:
     # identical structure to search_company_a but reads company_b and writes to data_b
 
-    company = state["company_b"]         # read the second company name from state
+    company = state["company_b"]          # read the second company name from state
+    industry = state["industry"]          # same optional context used in search_company_a
+    context = f" {industry}" if industry else ""  # same logic — empty string when no context was provided
 
-    q1 = f"{company} latest news product launches 2025"
-                                         # same query template, different company name
+    q1 = f"{company}{context} latest news product launches 2025"
+                                         # same query template as company_a, scoped by context
 
     results_1 = tavily.search(
         query=q1,
-        max_results=5,                   # increased from 3 → 5 for broader research coverage per query
+        max_results=7,                   # increased from 5 → 7 to match search_company_a
         days=state["days_back"],         # same user-chosen window as company_a query 1
     )
 
@@ -214,11 +242,12 @@ def search_company_b(state: RivalyzeState) -> dict:
         for r in results_1["results"]
     ]
 
-    q2 = f"{company} business overview growth strategy"
+    q2 = f"{company}{context} business overview growth strategy"
+                                         # context appended to keep strategy query in the same market as the news query
 
     results_2 = tavily.search(
         query=q2,
-        max_results=5,                   # increased from 3 → 5 for broader research coverage per query
+        max_results=7,                   # increased from 5 → 7 to match query 1
                                          # no days= filter — strategy/overview content is not time-bound
     )
 
@@ -227,14 +256,34 @@ def search_company_b(state: RivalyzeState) -> dict:
         for r in results_2["results"]
     ]
 
-    sources += [                         # append company_b query-2 sources — list now holds all 12
+    sources += [                         # append company_b query-2 sources to the running list
         {"title": r["title"], "url": r["url"]}
         for r in results_2["results"]
     ]
 
-    combined = "\n\n".join(snippets_1 + snippets_2)
-                                         # same concatenation — all research for company_b
-                                         # in one string ready for the analysis node
+    # ── Query 3: funding, investors, and valuation ─────────────
+    q3 = f"{company}{context} funding investors valuation strategy"
+                                         # mirrors the third query in search_company_a —
+                                         # surfaces fundraising rounds and investor signals for company_b
+
+    results_3 = tavily.search(
+        query=q3,
+        max_results=7,                   # same depth as queries 1 and 2
+                                         # no days= filter — funding data is evergreen
+    )
+
+    snippets_3 = [                       # same extraction pattern as snippets_1 and snippets_2
+        r["content"]
+        for r in results_3["results"]
+    ]
+
+    sources += [                         # append query-3 sources — list now covers all 6 queries across both companies
+        {"title": r["title"], "url": r["url"]}
+        for r in results_3["results"]
+    ]
+
+    combined = "\n\n".join(snippets_1 + snippets_2 + snippets_3)
+                                         # all three angles merged — matches the structure of data_a
 
     return {                             # return both updated keys
         "data_b":  combined,             # research text for company_b
@@ -331,7 +380,14 @@ report_prompt = PromptTemplate(
         "2. {company_b} Overview\n"
         "3. Key Differences\n"
         "4. Growth Comparison\n"
-        "5. Strategic Recommendations\n\n"
+        "5. Strategic Recommendations: Strategic Recommendations must be specific to these two "
+        "companies only. Each recommendation must directly reference a specific finding, number, "
+        "or named strategy from the analysis above. Do not write generic advice that could apply "
+        "to any company. Every recommendation must name either {company_a} or {company_b} "
+        "specifically and explain exactly what they should do and why, based on the data found.\n\n"
+                                         # specificity constraint: forces the LLM to anchor every
+                                         # recommendation to evidence from the Tavily research rather
+                                         # than producing boilerplate consulting advice
         "Format each section with ## headers and bullet points "
         "for key findings. Use markdown formatting throughout."
                                          # explicit formatting instruction: ## headers give Rich
@@ -405,10 +461,11 @@ app = graph.compile()                    # compile() validates the graph (checks
 # from outside this file (e.g. a FastAPI route or a test).
 # It isolates the caller from knowing about LangGraph internals.
 
-def run_agent(company_a: str, company_b: str, days_back: int) -> dict:
+def run_agent(company_a: str, company_b: str, days_back: int, industry: str = "") -> dict:
     # company_a:  name of the first company to research
     # company_b:  name of the second company to research
     # days_back:  lookback window in days for the news queries (30, 60, or 90)
+    # industry:   optional market context appended to queries; defaults to "" (no context)
     # -> dict:    the full final state returned by app.invoke()
 
     initial_state = {                    # build the starting state the same way the main block does
@@ -420,6 +477,7 @@ def run_agent(company_a: str, company_b: str, days_back: int) -> dict:
         "report":    "",
         "sources":   [],                 # empty list filled in by both search nodes
         "days_back": days_back,          # forwarded into state so search nodes can read it
+        "industry":  industry,           # forwarded into state so both search nodes can append it to queries
     }
 
     return app.invoke(initial_state)     # run the full graph and return the completed state dict;
@@ -463,6 +521,7 @@ if __name__ == "__main__":
         "report":    "",
         "sources":   [],                 # empty list; search nodes will append dicts as they run
         "days_back": days_back,          # user-chosen lookback window passed through to search nodes
+        "industry":  "",                 # CLI doesn't ask for industry — empty string disables context narrowing
     }
 
     final_state = app.invoke(initial_state)

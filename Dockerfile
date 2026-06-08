@@ -51,9 +51,12 @@ COPY . .
 # ─────────────────────────────────────────────────────────────
 # DEFAULT COMMAND
 # ─────────────────────────────────────────────────────────────
-# CMD tells Docker what to run when someone does "docker run <image>".
+# CMD is the default process Docker runs when the container starts.
 # It is NOT executed during the build — only at runtime.
-# The array form ["python", "hello.py"] is preferred over a plain
-# string because it avoids a shell wrapper, which means signals
-# (like Ctrl-C) reach Python directly instead of getting lost.
-CMD ["python", "hello.py"]
+# The array form avoids a shell wrapper so signals (Ctrl-C, SIGTERM)
+# reach uvicorn directly instead of being swallowed by /bin/sh.
+# This default starts the FastAPI service.
+# docker-compose overrides it for the Streamlit container by setting
+# a "command:" key in the service definition — that value replaces
+# this CMD entirely, so both services share the same image.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]  # start FastAPI on all interfaces at port 8001; 0.0.0.0 makes it reachable from outside the container

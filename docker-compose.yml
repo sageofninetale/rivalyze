@@ -1,27 +1,41 @@
-# docker-compose.yml lets you describe and run one or more containers
-# with a single command: "docker compose up".
-# It is a YAML file — indentation matters (use spaces, not tabs).
+# docker-compose.yml — defines all containers that make up Rivalyze.
+# Run everything with: docker compose up --build
+# Stop everything with: docker compose down
+# "version" is omitted — Compose v2 (bundled with Docker Desktop) doesn't need it.
 
-# "services" is the top-level key that lists every container you want to run.
-# Each entry under services becomes one running container.
-services:
+services:  # top-level key; every entry under here becomes one running container
 
-  # "rivalyze-hello" is the name you give this service.
-  # You can have many services here later (e.g. api, database, redis).
-  rivalyze-hello:
+  api:  # logical name for the FastAPI service; other services can reach it at http://api:<port>
 
-    # build: tells Compose to build the image from a Dockerfile
-    # rather than pulling a pre-built one from Docker Hub.
-    # "." means "look for the Dockerfile in the current directory."
-    build: .
+    build: .  # build the image from the Dockerfile in the current directory (same image shared by both services)
 
-    # image: names the image that gets built.
-    # Without this, Compose generates a name automatically.
-    # Naming it explicitly makes "docker images" easier to read.
-    image: rivalyze-hello
+    command: uvicorn main:app --host 0.0.0.0 --port 8001  # overrides the Dockerfile CMD; starts FastAPI on all interfaces so it's reachable inside the Docker network
 
-    # restart: "no" means Docker will NOT restart the container
-    # automatically if it exits. For a script that runs once and
-    # finishes, this is correct. Later, for a web server, you'd
-    # use "unless-stopped" instead.
-    restart: "no"
+    ports:
+      - "8001:8001"  # maps host port 8001 → container port 8001; lets you call the API from your browser or curl at localhost:8001
+
+    env_file:
+      - .env  # loads TAVILY_API_KEY and GROQ_API_KEY from the .env file into the container's environment; keeps secrets out of this file
+
+    restart: unless-stopped  # restart the container automatically if it crashes; "unless-stopped" means it stays down only when you explicitly run docker compose stop
+
+
+  frontend:  # logical name for the Streamlit service; depends on api being healthy first
+
+    build: .  # same Dockerfile and image as the api service — docker-compose command: overrides the CMD so both services share one image
+
+    command: streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0  # overrides Dockerfile CMD; starts Streamlit on all interfaces at port 8501
+
+    ports:
+      - "8501:8501"  # maps host port 8501 → container port 8501; open http://localhost:8501 in your browser to use the UI
+
+    env_file:
+      - .env  # same .env file as the api service — Streamlit doesn't need the API keys directly, but loading it is harmless and keeps config consistent
+
+    environment:
+      - API_URL=http://api:8001  # tells Streamlit where to find the FastAPI service; "api" resolves to the api container's IP inside Docker's internal network — this is why the api service is named "api"
+
+    depends_on:
+      - api  # Compose starts the api container before the frontend container; prevents Streamlit from booting and immediately failing to connect
+
+    restart: unless-stopped  # same restart policy as api — keeps the UI up if Streamlit crashes

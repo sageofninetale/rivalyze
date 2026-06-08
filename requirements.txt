@@ -1,9 +1,14 @@
-# Add one package per line. Pin versions with == to prevent surprise breakage.
 # Install everything in one shot: pip install -r requirements.txt
+# Add one package per line. Pin versions with == to prevent surprise breakage once stable.
 
-python-dotenv       # loads .env files into os.environ (used in agent.py: load_dotenv)
-langchain-core      # base types and interfaces shared across all LangChain packages
-langchain-groq      # LangChain wrapper for the Groq API (ChatGroq class)
-langgraph           # graph-based agent framework built on top of LangChain
-tavily-python       # official Tavily client for real-time web search (TavilyClient)
-rich                # terminal rendering library — renders markdown, tables, and styled text
+langgraph            # graph-based agent framework — defines the nodes and edges that make up the Rivalyze pipeline
+langchain-groq       # LangChain wrapper for the Groq API — provides the ChatGroq class used to call the LLM
+langchain-core       # base types and interfaces shared across all LangChain packages — required by langchain-groq and langgraph
+langchain-community  # community-maintained LangChain integrations — pulled in as a transitive dependency by several LangChain packages
+tavily-python        # official Tavily client — used in agent.py to run real-time web searches for each company
+python-dotenv        # reads .env files into os.environ — loads TAVILY_API_KEY and GROQ_API_KEY at startup
+rich                 # terminal rendering library — pretty-prints the final report and sources in the CLI entrypoint
+fastapi              # async web framework — wraps run_agent() behind a POST /report HTTP endpoint in main.py
+uvicorn              # ASGI server — runs the FastAPI app; required because FastAPI itself has no built-in server
+streamlit            # turns streamlit_app.py into an interactive web UI with no HTML or JavaScript needed
+requests             # standard HTTP client — used in streamlit_app.py to call the FastAPI /report endpoint

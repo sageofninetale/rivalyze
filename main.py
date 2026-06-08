@@ -17,6 +17,7 @@ class ReportRequest(BaseModel):          # describes the JSON body a caller must
     company_a: str                       # name of the first company — required, no default
     company_b: str                       # name of the second company — required, no default
     days_back: int = 90                  # how far back Tavily searches; defaults to 90 so callers can omit it
+    industry: str = ""                   # optional market context e.g. "UK care home software"; defaults to "" so existing callers don't break
 
 
 class ReportResponse(BaseModel):         # describes the JSON body the API sends back after the report is ready
@@ -37,6 +38,7 @@ async def generate_report(request: ReportRequest):   # async lets the server han
         request.company_a,                           # first company name, taken directly from the validated request body
         request.company_b,                           # second company name, taken directly from the validated request body
         request.days_back,                           # search window in days, taken directly from the validated request body
+        request.industry,                            # optional market context; empty string when omitted — run_agent passes it straight to state
     )
     return ReportResponse(                           # construct the response object — Pydantic validates types, FastAPI serialises it to JSON automatically
         company_a=request.company_a,                 # echo the input company name so the caller can match response to request
