@@ -399,6 +399,34 @@ app = graph.compile()                    # compile() validates the graph (checks
 
 
 # ─────────────────────────────────────────────────────────────
+# RUN AGENT — PUBLIC INTERFACE
+# ─────────────────────────────────────────────────────────────
+# This function is the single entry point for running the graph
+# from outside this file (e.g. a FastAPI route or a test).
+# It isolates the caller from knowing about LangGraph internals.
+
+def run_agent(company_a: str, company_b: str, days_back: int) -> dict:
+    # company_a:  name of the first company to research
+    # company_b:  name of the second company to research
+    # days_back:  lookback window in days for the news queries (30, 60, or 90)
+    # -> dict:    the full final state returned by app.invoke()
+
+    initial_state = {                    # build the starting state the same way the main block does
+        "company_a": company_a,          # passed in directly — no input() needed when called externally
+        "company_b": company_b,
+        "data_a":    "",                 # empty strings filled in by search nodes during the run
+        "data_b":    "",
+        "analysis":  "",
+        "report":    "",
+        "sources":   [],                 # empty list filled in by both search nodes
+        "days_back": days_back,          # forwarded into state so search nodes can read it
+    }
+
+    return app.invoke(initial_state)     # run the full graph and return the completed state dict;
+                                         # caller can read result["report"], result["sources"], etc.
+
+
+# ─────────────────────────────────────────────────────────────
 # MAIN BLOCK — ENTRY POINT
 # ─────────────────────────────────────────────────────────────
 # This block only runs when you execute the file directly:
